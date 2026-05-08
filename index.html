@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Peluquería Alex - Gestión Total</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 1000px; margin: 20px auto; background-color: #f8f9fa; color: #333; }
+        h1 { text-align: center; color: #2c3e50; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee; }
+        
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; font-size: 14px; }
+        
+        button { background: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        button:hover { background: #2980b9; transform: translateY(-1px); }
+        .btn-save { background: #27ae60; width: 100%; margin-top: 15px; font-size: 16px; }
+        .btn-save:hover { background: #219150; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; margin-top: 20px; }
+        th, td { padding: 15px; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: #f1f3f5; font-weight: 600; }
+        
+        /* Badges de Estado */
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+        .Pendiente { background: #fff3cd; color: #856404; }
+        .Realizado { background: #d4edda; color: #155724; }
+        .Cancelado { background: #f8d7da; color: #721c24; }
+
+        .btn-edit { color: #3498db; cursor: pointer; margin-right: 15px; font-weight: bold; }
+        .btn-delete { color: #e74c3c; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>💇‍♂️ Peluquería Alex - Panel de Control</h1>
+
+    <div class="card">
+        <h3>Agendar / Editar / Eliminar Citas</h3>
+        <form id="citaForm">
+            <input type="hidden" id="citaId">
+            <div class="grid-inputs">
+                <input type="text" id="cliente" placeholder="Nombre completo" required>
+                
+                <select id="servicio" required>
+                    <option value="" disabled selected>Categoría de Servicio...</option>
+                    <option value="Corte">Corte</option>
+                    <option value="Alisado">Alisado</option>
+                    <option value="Permanente">Permanente</option>
+                    <option value="Nutrición">Nutrición</option>
+                    <option value="Tintura">Tintura</option>
+                </select>
+
+                <input type="datetime-local" id="fecha" required>
+
+                <select id="estado">
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Realizado">Realizado</option>
+                    <option value="Cancelado">Cancelado</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-save">Guardar Cita</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>Consultas Rápidas</h3>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button onclick="cargarCitas()" style="background:#6c757d">🔄 Ver Todo</button>
+            
+            <input type="number" id="busId" placeholder="ID" style="width:80px">
+            <button onclick="buscarPorId()">🆔</button>
+
+            <input type="text" id="busNom" placeholder="Nombre..." style="width:150px">
+            <button onclick="buscarPorNombre()">👤</button>
+
+            <select id="busCat" style="width:130px">
+                <option value="Corte">Corte</option>
+                <option value="Alisado">Alisado</option>
+                <option value="Permanente">Permanente</option>
+                <option value="Nutrición">Nutrición</option>
+                <option value="Tintura">Tintura</option>
+            </select>
+            <button onclick="buscarPorCategoria()">✂️</button>
+
+            <input type="date" id="busFec" style="width:140px">
+            <button onclick="buscarPorFecha()">📅</button>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>Servicio</th>
+                <th>Estado</th>
+                <th>Fecha y Hora</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCitas"></tbody>
+    </table>
+
+    <script>
+        const API_URL = 'http://localhost:3000/citas';
+        const tabla = document.getElementById('tablaCitas');
+
+        async function cargarCitas() {
+            const res = await fetch(API_URL);
+            renderizar(await res.json());
+        }
+
+        function renderizar(data) {
+            tabla.innerHTML = '';
+            // Si el buscar por ID devuelve un objeto solo, lo metemos en un array
+            const citas = Array.isArray(data) ? data : [data];
+            
+            if (!data || citas.length === 0 || !citas[0]) {
+                tabla.innerHTML = '<tr><td colspan="6" style="text-align:center">Sin resultados</td></tr>';
+                return;
+            }
+
+            citas.forEach(c => {
+                tabla.innerHTML += `
+                    <tr>
+                        <td>${c.id}</td>
+                        <td>${c.cliente}</td>
+                        <td><strong>${c.servicio}</strong></td>
+                        <td><span class="badge ${c.estado}">${c.estado}</span></td>
+                        <td>${new Date(c.fecha).toLocaleString()}</td>
+                        <td>
+                            <span class="btn-edit" onclick="prepararEdicion(${c.id}, '${c.cliente}', '${c.servicio}', '${c.fecha}', '${c.estado}')">Editar</span>
+                            <span class="btn-delete" onclick="eliminar(${c.id})">Borrar</span>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        document.getElementById('citaForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('citaId').value;
+            const body = {
+                cliente: document.getElementById('cliente').value,
+                servicio: document.getElementById('servicio').value,
+                fecha: document.getElementById('fecha').value,
+                estado: document.getElementById('estado').value
+            };
+            await fetch(id ? `${API_URL}/${id}` : API_URL, {
+                method: id ? 'PUT' : 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            e.target.reset();
+            document.getElementById('citaId').value = '';
+            cargarCitas();
+        };
+
+        async function eliminar(id) {
+            if(confirm('¿Estas seguro que quieres eliminar esta cita?')) { await fetch(`${API_URL}/${id}`, {method:'DELETE'}); cargarCitas(); }
+        }
+
+        function prepararEdicion(id, cli, ser, fec, est) {
+    document.getElementById('citaId').value = id;
+    document.getElementById('cliente').value = cli;
+    document.getElementById('servicio').value = ser;
+    document.getElementById('estado').value = est;
+
+    // --- CORRECCIÓN DE FECHA ---
+    // Creamos el objeto fecha
+    const date = new Date(fec);
+    
+    // Obtenemos el desfase horario en minutos (ej: Argentina es -180)
+    const offset = date.getTimezoneOffset() * 60000;
+    
+    // Ajustamos la fecha restando el desfase para que coincida con la hora local real
+    const localISOTime = new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    
+    document.getElementById('fecha').value = localISOTime;
+    // ---------------------------
+
+    window.scrollTo(0, 0); // Sube al formulario para que veas que estás editando
+}
+
+        // --- BÚSQUEDAS ---
+        async function buscarPorId() {
+            const id = document.getElementById('busId').value;
+            if(!id) return;
+            const res = await fetch(`${API_URL}/${id}`);
+            renderizar(await res.json());
+        }
+
+        async function buscarPorNombre() {
+            const nom = document.getElementById('busNom').value;
+            const res = await fetch(`${API_URL}/buscar/nombre?nombre=${nom}`);
+            renderizar(await res.json());
+        }
+
+        async function buscarPorCategoria() {
+            const cat = document.getElementById('busCat').value;
+            const res = await fetch(`${API_URL}/buscar/categoria?categoria=${cat}`);
+            renderizar(await res.json());
+        }
+
+        async function buscarPorFecha() {
+            const fec = document.getElementById('busFec').value;
+            if(!fec) return;
+            const res = await fetch(`${API_URL}/buscar/fecha?fecha=${fec}`);
+            renderizar(await res.json());
+        }
+
+        cargarCitas();
+    </script>
+</body>
+</html>
